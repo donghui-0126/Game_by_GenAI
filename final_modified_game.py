@@ -38,18 +38,22 @@ player_max_bullets = 5  # Maximum number of bullets that can be fired in a row
 player_remaining_bullets = player_max_bullets  # Initialize remaining bullets
 player_invincible_duration = 2000
 player_invincible_end_time = 0
-player_bullet_damage = 1  # Default attack power
+player_bullet_damage = 100  # Default attack power
+player_boss_bullet_damage = 2  # Increased damage against boss
 
 # Item setup
 item_img = pygame.image.load('picture/item.png')
 item_img = pygame.transform.scale(item_img, (30, 30))
 item_rect = item_img.get_rect(midbottom=(random.randint(0, WIDTH), 0))
 
+# Boss Damage item setup
+boss_damage_item_img = pygame.image.load('picture/item.png')
+boss_damage_item_img = pygame.transform.scale(boss_damage_item_img, (30, 30))
+boss_damage_item_rect = boss_damage_item_img.get_rect(midbottom=(random.randint(0, WIDTH), 0))
+
 # Bullet setup
 bullets = []
 bullet_speed = 8
-max_bullets = 30000  # Maximum number of bullets
-remaining_bullets = max_bullets  # Initialize remaining bullets
 
 # Enemy setup
 enemies = []
@@ -60,11 +64,13 @@ last_enemy_spawn = pygame.time.get_ticks()
 # Boss setup
 boss_rect = boss_img.get_rect(midbottom=(WIDTH//2, 0))
 boss_speed = 2
-boss_health = 500
+boss_health = 300  # Reduced boss health
 boss_active = False
 boss_attack_delay = 3000
 last_boss_attack = pygame.time.get_ticks()
 boss_bullets = []  # List to store boss bullets
+boss_vulnerable_zone = pygame.Rect(boss_rect.left + 20, boss_rect.top + 20, 60, 60)  # Boss vulnerable zone
+boss_points = 100  # Points awarded for defeating the boss
 
 # Score setup
 score = 0
@@ -84,6 +90,12 @@ while running:
         item_rect.bottom = 0
         item_rect.centerx = random.randint(0, WIDTH)
 
+    # Boss Damage item collision check
+    if player_rect.colliderect(boss_damage_item_rect):
+        player_boss_bullet_damage += 1  # Increase damage against boss
+        boss_damage_item_rect.bottom = 0
+        boss_damage_item_rect.centerx = random.randint(0, WIDTH)
+
     # Player movement
     keys = pygame.key.get_pressed()
     if keys[pygame.K_LEFT] and player_rect.left > 0:
@@ -99,7 +111,6 @@ while running:
         bullets.append(bullet)
         player_remaining_bullets -= 1  # Decrement remaining bullets
 
-
     # Move bullets and check collisions
     for bullet in bullets[:]:  # Iterate over a copy of the list to avoid modifying the original list
         bullet.y -= bullet_speed
@@ -107,8 +118,7 @@ while running:
             bullets.remove(bullet)
             player_remaining_bullets = player_max_bullets  # Reset remaining bullets when all bullets go off-screen
 
-    # Bullet and enemy collision check
-    for bullet in bullets[:]:
+        # Bullet and enemy collision check
         for enemy in enemies:
             if bullet.colliderect(enemy[0]):
                 bullets.remove(bullet)  # Remove bullet
@@ -116,6 +126,19 @@ while running:
                 score += 1  # Increase score for enemy kill
                 player_remaining_bullets = player_max_bullets  # Reset remaining bullets when all bullets hit enemies
                 break  # Stop checking collision with other enemies
+
+        # Bullet and boss collision check
+        if boss_active:
+            if bullet.colliderect(boss_rect):
+                bullets.remove(bullet)  # Remove bullet
+                if bullet.colliderect(boss_vulnerable_zone):
+                    boss_health -= player_boss_bullet_damage  # Increased damage in vulnerable zone
+                else:
+                    boss_health -= player_bullet_damage  # Regular damage
+            if boss_health <= 0:
+                boss_active = False
+                score += boss_points  # Add boss points to the score
+                running = False  # Game over condition after defeating the boss
 
     # Spawn enemies
     now = pygame.time.get_ticks()
@@ -159,7 +182,10 @@ while running:
             boss_bullet = boss_img.get_rect(midbottom=boss_rect.midbottom)
             boss_bullets.append(boss_bullet)
 
-    # Move boss bullets
+        # Update boss vulnerable zone
+        boss_vulnerable_zone.center = boss_rect.center
+
+        # Move boss bullets
     for boss_bullet in boss_bullets:
         boss_bullet.y += bullet_speed
         if boss_bullet.top > HEIGHT:
@@ -196,21 +222,25 @@ while running:
         screen.blit(enemy_img, enemy[0])
     if boss_active:
         screen.blit(boss_img, boss_rect)
+        pygame.draw.rect(screen, BLUE, boss_vulnerable_zone, 2)  # Draw boss vulnerable zone
         for boss_bullet in boss_bullets:
             pygame.draw.rect(screen, RED, boss_bullet)
 
     # Draw items
     screen.blit(item_img, item_rect)
+    screen.blit(boss_damage_item_img, boss_damage_item_rect)
 
-    # Display score and player health
+    # Display score, player health, and boss health
     score_text = font.render("Score: " + str(score), True, WHITE)
     health_text = font.render("Health: " + str(player_health), True, WHITE)
+    boss_health_text = font.render("Boss Health: " + str(boss_health), True, WHITE)
     screen.blit(score_text, (10, 10))
     screen.blit(health_text, (10, 40))
+    screen.blit(boss_health_text, (10, 70))
 
     pygame.display.flip()
     pygame.time.Clock().tick(60)
 
-    # Exit
+# Exit
 pygame.quit()
-sys.exit()  
+sys.exit()
